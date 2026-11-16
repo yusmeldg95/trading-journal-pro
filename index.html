@@ -169,7 +169,7 @@ function initServer(){
 }
 
 </script><script src="https://accounts.google.com/gsi/client" async defer></script><script>
-/* DRIVE_SYNC_V36 */
+/* DRIVE_SYNC_V45_AUTOAUTH */
 (function(){
 'use strict';
 const KEY='tjp-drive-client-id-v36', META='tjp-drive-sync-v36', TOMBS='tjp-drive-tombstones-v36';
@@ -235,12 +235,55 @@ $id('addAccount').addEventListener('click',()=>setTimeout(()=>{const a=accounts.
 $id('googleOrigin').value=location.origin;
 $id('googleClientId').value=localStorage.getItem(KEY)||'';
 $id('googleClientId').addEventListener('change',()=>localStorage.setItem(KEY,$id('googleClientId').value.trim()));
-$id('connectDrive').onclick=()=>{const id=$id('googleClientId').value.trim();if(!/^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(id)){status('Introduce un ID de cliente OAuth válido de Google Cloud.');return}if(location.protocol!=='https:'&&location.hostname!=='localhost'&&location.hostname!=='127.0.0.1'){status('Google OAuth requiere HTTPS o localhost. No funciona abriendo file://.');return}if(!window.google?.accounts?.oauth2){status('No se cargó Google Identity Services. Comprueba internet o bloqueadores.');return}localStorage.setItem(KEY,id);
-const client=google.accounts.oauth2.initTokenClient({client_id:id,scope:'https://www.googleapis.com/auth/drive.appdata',callback:(resp)=>{if(resp.error||!resp.access_token){status('Google no autorizó el acceso: '+(resp.error||'sin token'));return}token=resp.access_token;connected=true;sync()}});client.requestAccessToken({prompt:'consent'});
-};
-$id('syncDrive').onclick=sync;
-$id('disconnectDrive').onclick=()=>{if(token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(token,()=>{});token=null;connected=false;status('Drive desconectado. Los datos locales siguen disponibles.');};
-window.addEventListener('online',()=>{if(token)sync()});window.addEventListener('focus',()=>{if(token)sync()});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&token)sync()});setInterval(()=>{if(token&&!document.hidden)sync()},60000);
+const DISABLED='tjp-drive-autoconnect-disabled-v45';
+let authClient=null,authPending=false,tokenExpiry=0,lastAutoAttempt=0;
+function validClientId(id){return /^\\d+-[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)}
+function authReady(){return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'}
+function initAuth(id){
+ if(!validClientId(id)||!authReady()||!window.google?.accounts?.oauth2)return false;
+ authClient=google.accounts.oauth2.initTokenClient({
+   client_id:id,scope:'https://www.googleapis.com/auth/drive.appdata',
+   callback:(resp)=>{
+     authPending=false;
+     if(resp.error||!resp.access_token){
+       token=null;connected=false;
+       status('Drive necesita autorización de Google. Tus operaciones siguen guardadas localmente. Pulsa Conectar Google Drive cuando quieras reautorizar.');
+       return;
+     }
+     token=resp.access_token;connected=true;
+     tokenExpiry=Date.now()+(Math.max(60,Number(resp.expires_in)||3600)-90)*1000;
+     status('✓ Google autorizado · comprobando datos de Drive…');
+     sync();
+   },
+   error_callback:()=>{authPending=false;status('No se pudo abrir la autorización de Google. Los datos locales están seguros.');}
+ });
+ return true;
+}
+function requestAuth(interactive=false){
+ if(authPending)return;
+ const id=$id('googleClientId').value.trim();
+ if(!validClientId(id)){if(interactive)status('Introduce un ID de cliente OAuth válido.');return}
+ if(!initAuth(id)){if(interactive)status('No se pudo cargar Google Identity Services o falta HTTPS.');return}
+ localStorage.setItem(KEY,id);
+ if(interactive)localStorage.removeItem(DISABLED);
+ authPending=true;
+ lastAutoAttempt=Date.now();
+ status(interactive?'Conectando con Google…':'Recuperando sesión de Google Drive…');
+ try{authClient.requestAccessToken({prompt:interactive?'select_account':''})}
+ catch(e){authPending=false;status('Google requiere autorización manual. Los datos locales siguen disponibles.')}
+}
+$id('connectDrive').onclick=()=>requestAuth(true);
+function autoAuth(){
+ if(localStorage.getItem(DISABLED)==='1'||!validClientId($id('googleClientId').value.trim()))return;
+ if(token&&Date.now()<tokenExpiry)return;
+ if(authPending||Date.now()-lastAutoAttempt<120000)return;
+ if(!window.google?.accounts?.oauth2){setTimeout(autoAuth,1500);return}
+ requestAuth(false);
+}
+setTimeout(autoAuth,800);
+$id('syncDrive').onclick=()=>{if(token)sync();else requestAuth(true)};
+$id('disconnectDrive').onclick=()=>{if(token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(token,()=>{});token=null;connected=false;localStorage.setItem(DISABLED,'1');status('Drive desconectado. Los datos locales siguen disponibles.');};
+window.addEventListener('online',()=>{if(token)sync();else autoAuth()});window.addEventListener('focus',()=>{if(token)sync();else autoAuth()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(token)sync();else autoAuth()}});setInterval(()=>{if(document.hidden)return;if(token&&Date.now()<tokenExpiry)sync();else if(token&&Date.now()>=tokenExpiry){token=null;connected=false;autoAuth()}},60000);
 if(location.protocol==='file:')status('Guardado local activo. Para conectar Google Drive, publica el journal en HTTPS y abre esa dirección.');
 })();
 </script></body></html>
