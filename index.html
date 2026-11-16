@@ -237,7 +237,7 @@ $id('googleClientId').value=localStorage.getItem(KEY)||'';
 $id('googleClientId').addEventListener('change',()=>localStorage.setItem(KEY,$id('googleClientId').value.trim()));
 const DISABLED='tjp-drive-autoconnect-disabled-v45';
 let authClient=null,authPending=false,tokenExpiry=0,lastAutoAttempt=0;
-function validClientId(id){return /^\\d+-[\\w-]+\\.apps\\.googleusercontent\\.com$/.test(id)}
+function validClientId(id){return /^\d+-[\w-]+\.apps\.googleusercontent\.com$/.test(id)}
 function authReady(){return location.protocol==='https:'||location.hostname==='localhost'||location.hostname==='127.0.0.1'}
 function initAuth(id){
  if(!validClientId(id)||!authReady()||!window.google?.accounts?.oauth2)return false;
