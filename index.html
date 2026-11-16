@@ -283,7 +283,7 @@ function autoAuth(){
 if(localStorage.getItem(KEY))status('✓ Historial local disponible. Para activar Drive en esta sesión, pulsa Conectar Google Drive.');
 $id('syncDrive').onclick=()=>{if(token)sync();else requestAuth(true)};
 $id('disconnectDrive').onclick=()=>{if(token&&window.google?.accounts?.oauth2)google.accounts.oauth2.revoke(token,()=>{});token=null;connected=false;localStorage.setItem(DISABLED,'1');status('Drive desconectado. Los datos locales siguen disponibles.');};
-window.addEventListener('online',()=>{if(token)sync();else {}});window.addEventListener('focus',()=>{if(token)sync();else autoAuth()});document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(token)sync();else autoAuth()}});setInterval(()=>{if(document.hidden)return;if(token&&Date.now()<tokenExpiry)sync();else if(token&&Date.now()>=tokenExpiry){token=null;connected=false;status('La sesión de Drive expiró. Los registros siguen guardados localmente; pulsa Conectar Google Drive para continuar.')}},60000);
+window.addEventListener('online',()=>{if(token)sync();else {}});window.addEventListener('focus',()=>{if(token)sync();});document.addEventListener('visibilitychange',()=>{if(!document.hidden){if(token)sync();}});setInterval(()=>{if(document.hidden)return;if(token&&Date.now()<tokenExpiry)sync();else if(token&&Date.now()>=tokenExpiry){token=null;connected=false;status('La sesión de Drive expiró. Los registros siguen guardados localmente; pulsa Conectar Google Drive para continuar.')}},60000);
 if(location.protocol==='file:')status('Guardado local activo. Para conectar Google Drive, publica el journal en HTTPS y abre esa dirección.');
 })();
 </script></body></html>
